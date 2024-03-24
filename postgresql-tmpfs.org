@@ -1,0 +1,492 @@
+#+TITLE: PostgreSQL + tmpfs
+#+OPTIONS: creator:nil author:nil date:nil toc:nil
+#+PROPERTY: HEADER-ARGS+ :eval no-export
+
+I have heard heard a couple of times that you use Temporary File
+System (tmpfs) to store data in volatile memory instead of persisting
+data to your storage device. Intuitively you assume that this will
+always give us _*/BLAZINGLY FAST/*_ IO, right?
+
+* Chapter One: select-only
+
+Say you have some small database (<500MB) and the workload on such
+database leans heavily on read side of operations.
+
+I thought to myself, what if we spin a read-only replica via streaming
+replication with =tmpfs=?
+
+Something like this:
+
+#+BEGIN_SRC plantuml :file read-arch.png
+  @startuml
+  component SSD {
+    database master
+    folder wal_archive {
+      file "0000000100000000000000D0" as wal
+    }
+  }
+  component RAM {
+    database replica
+  }
+  master -down-> wal_archive
+  master <- replica
+  replica -> wal_archive
+  @enduml
+#+END_SRC
+
+#+RESULTS:
+[[file:read-arch.png]]
+
+** Setup
+
+Creating the master database.
+
+As =postgres= user:
+#+NAME: setup-master-database
+#+BEGIN_SRC sh :dir /su:postgres@localhost: :results verbatim :exports code
+  mkdir --parents /var/lib/postgres/16/wal_archive
+
+  # Create database
+  initdb --auth-local=trust /var/lib/postgres/16/master
+
+  # Helper function to edit postgresql.conf
+  function set_prop() { \
+    sed --regexp-extended \
+        --in-place \
+        "s,^#$1.*?$,$1 = $2,gI" \
+        /var/lib/postgres/16/master/postgresql.conf; \
+  }
+
+  # Edit relevant postgresql.conf properties
+  set_prop wal_level replica
+  set_prop archive_mode on
+  set_prop archive_command "'test ! -f /var/lib/postgres/16/wal_archive/%f \&\& cp %p /var/lib/postgres/16/wal_archive/%f'"
+  set_prop restore_command "'cp /var/lib/postgres/16/wal_archive/%f %p'"
+  set_prop archive_cleanup_command "'pg_archivecleanup /var/lib/postgres/16/wal_archive %r'"
+  set_prop primary_conninfo "'host=localhost port=5432 user=replicator'"
+
+  # Start RDBMS
+  pg_ctl --pgdata=/var/lib/postgres/16/master \
+         --log=/var/lib/postgres/16/master/log \
+         start
+
+  # Create replication user
+  createuser --replication replicator
+#+END_SRC
+
+#+RESULTS: setup-master-database
+#+begin_example
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+creating directory /var/lib/postgres/16/master ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... America/Sao_Paulo
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgres/16/master -l logfile start
+
+waiting for server to start.... done
+server started
+#+end_example
+
+Creating the replica with tmpfs
+
+As =root=:
+#+NAME: create-tmpfs.sh
+#+BEGIN_SRC sh :dir /su:root@localhost: :results verbatim :exports code
+  mkdir --parents /mnt/ramdisk
+  mount --types tmpfs --options='size=8192m,mode=0700' tmpfs /mnt/ramdisk
+  chown --recursive postgres:postgres /mnt/ramdisk
+#+END_SRC
+
+#+RESULTS: create-tmpfs.sh
+
+As =postgres=:
+#+NAME: setup-replica.sh
+#+BEGIN_SRC sh :dir /su:postgres@localhost: :results verbatim :exports code
+  pg_basebackup --write-recovery-conf \
+                --pgdata=/mnt/ramdisk
+
+  # Start the tmpfs replica on port 5433
+  pg_ctl --pgdata=/mnt/ramdisk    \
+         --options='-c port=5433' \
+         --log=/mnt/ramdisk/log   \
+         start
+#+END_SRC
+
+#+RESULTS: setup-replica.sh
+: waiting for server to start.... done
+: server started
+
+** Benchmark
+
+First, generate some data on the master instance as the =postgres= user:
+
+#+NAME: populate-master-scale30.sh
+#+BEGIN_SRC sh :dir /su:postgres@localhost: :results verbatim :exports code
+  pgbench --port=5432    \
+          --initialize   \
+          --foreign-keys \
+          --scale=30     \
+          postgres
+#+END_SRC
+
+see: https://www.postgresql.org/docs/current/pgbench.html
+
+How many records did this generate?
+
+#+NAME: master-account-count.sh
+#+BEGIN_SRC sql :engine postgres :cmdline "--no-psqlrc" :dbuser postgres :database postgres :port 5432 :outputs verbatim :exports both
+  select to_char(count(*), '999,999,990') as accounts from pgbench_accounts;
+#+END_SRC
+
+#+RESULTS: master-account-count.sh
+| accounts  |
+|-----------|
+| 3,000,000 |
+
+We will be using the =select-only= built-in script for the benchmarks:
+
+#+BEGIN_SRC sql
+-- select-only: <builtin: select only>
+\set aid random(1, 100000 * :scale)
+SELECT abalance FROM pgbench_accounts WHERE aid = :aid;
+#+END_SRC
+
+Now, for some action, as the =postgres= user:
+#+NAME: master-scale30-benchmark.sh
+#+BEGIN_SRC sh :dir /su:postgres@localhost: :results verbatim :exports both
+  # change port to 5433 to run against the replica database
+  pgbench --port=5432   \
+          --time=60     \
+          --client=100  \
+          --jobs=3      \
+          --select-only \
+          --no-vacuum   \
+          postgres
+#+END_SRC
+
+Against the master instance:
+#+RESULTS: master-scale30-benchmark.sh
+#+begin_example
+pgbench (16.1)
+transaction type: <builtin: select only>
+scaling factor: 30
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 5453634
+number of failed transactions: 0 (0.000%)
+latency average = 1.100 ms
+initial connection time = 74.276 ms
+tps = 90905.785932 (without initial connection time)
+#+end_example
+
+Against the replica instance:
+#+NAME: replica-scale30-benchmark.sh
+#+BEGIN_SRC sh :dir /su:postgres@localhost: :results verbatim :exports results
+  pgbench --port=5433   \
+          --time=60     \
+          --client=100  \
+          --jobs=3      \
+          --select-only \
+          --no-vacuum   \
+          postgres
+#+END_SRC
+
+#+RESULTS: replica-scale30-benchmark.sh
+#+begin_example
+pgbench (16.1)
+transaction type: <builtin: select only>
+scaling factor: 30
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 5506013
+number of failed transactions: 0 (0.000%)
+latency average = 1.089 ms
+initial connection time = 74.259 ms
+tps = 91793.918172 (without initial connection time)
+#+end_example
+
+Well, that is a surprise (for me at least). I was expecting the
+=tmpfs= to outperform the master database by a moderate/large
+margin. It seems the PostgreSQL + Operating System (OS) caches are
+doing a great job.
+
+# Let's check how much of the =shared_buffers= is used by each relation
+# from =public=.
+
+# #+NAME: create-extensions.sql
+# #+BEGIN_SRC sql :engine postgres :cmdline "--no-psqlrc" :dbuser postgres :database postgres :results verbatim :exports code
+#   create extension if not exists pg_buffercache;
+# #+END_SRC
+
+# #+RESULTS: create-extensions.sql
+# : CREATE EXTENSION
+
+# #+NAME: shared-buffer-content.sql
+# #+BEGIN_SRC sql :engine postgres :cmdline "--no-psqlrc" :dbuser postgres :database postgres
+#   select x.relname
+#        , pg_size_pretty(x.buffered_size) as "buffered_size"
+#        , pg_size_pretty(x.relation_size) as "size"
+#        , round(100.0 * least(x.buffered_size, x.relation_size) / x.relation_size, 2) as "ratio"
+#   from
+#   (
+#     select cl.relname
+#          , count(bc.bufferid) as "buffers_used"
+#          , count(bc.bufferid) * (select current_setting('block_size')::bigint) as "buffered_size"
+#          , pg_relation_size(cl.oid) as "relation_size"
+#       from pg_buffercache bc
+#       join pg_database db on db.oid = bc.reldatabase
+#       join pg_class cl on cl.relfilenode = bc.relfilenode
+#      where db.datname = 'postgres'
+#        and cl.relnamespace = 'public'::regnamespace
+#      group by cl.oid, cl.relname
+#   ) x
+#   order by x.relation_size desc
+# #+END_SRC
+
+# #+RESULTS: shared-buffer-content.sql
+# | relname               | buffered_size | size   | ratio |
+# |-----------------------+---------------+--------+-------|
+# | pgbench_accounts      | 75 MB         | 384 MB | 19.61 |
+# | pgbench_accounts_pkey | 51 MB         | 64 MB  | 79.41 |
+
+Let's try with a slightly bigger dataset (10x bigger).
+
+#+NAME: master-populate-scale-300.sh
+#+BEGIN_SRC sh :dir /su:postgres@localhost: :results verbatim :outputs none
+  pgbench --port=5432    \
+          --initialize   \
+          --foreign-keys \
+          --scale=300    \
+          postgres
+#+END_SRC
+
+Lets check the master database size:
+
+#+NAME: database-size.sh
+#+BEGIN_SRC sql :engine postgres :cmdline "--no-psqlrc" :dbuser postgres :database postgres :port 5432 :exports verbatim :exports both
+  select relname
+       , pg_size_pretty(pg_relation_size(cl.oid)) as "size"
+    from pg_class cl
+   where cl.relnamespace = 'public'::regnamespace
+   order by pg_relation_size(cl.oid) desc
+#+END_SRC
+
+#+RESULTS: database-size.sh
+#+BEGIN_EXAMPLE
+| relname               | size    |
+|-----------------------+---------|
+| pgbench_accounts      | 3842 MB |
+| pgbench_accounts_pkey | 643 MB  |
+| pgbench_tellers       | 136 kB  |
+| pgbench_tellers_pkey  | 88 kB   |
+| pgbench_branches_pkey | 16 kB   |
+| pgbench_branches      | 16 kB   |
+| pgbench_history       | 0 bytes |
+#+END_EXAMPLE
+
+
+Lets run again the =select-only= benchmarks! Against the master
+instance:
+
+#+NAME: master-scale300-benchmark.sh
+#+BEGIN_SRC sh :dir /su:postgres@localhost: :results verbatim :exports results
+  pgbench --port=5432   \
+          --time=60     \
+          --client=100  \
+          --jobs=3      \
+          --select-only \
+          --no-vacuum   \
+          postgres
+#+END_SRC
+
+#+RESULTS: master-scale300-benchmark.sh
+#+begin_example
+pgbench (16.1)
+transaction type: <builtin: select only>
+scaling factor: 300
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 5146134
+number of failed transactions: 0 (0.000%)
+latency average = 1.165 ms
+initial connection time = 86.478 ms
+tps = 85832.914187 (without initial connection time)
+#+end_example
+
+#+NAME: replica-scale300-benchmark.sh
+#+BEGIN_SRC sh :dir /su:postgres@localhost: :results verbatim :exports results
+  pgbench --port=5433   \
+          --time=60     \
+          --client=100  \
+          --jobs=3      \
+          --select-only \
+          --no-vacuum   \
+          postgres
+#+END_SRC
+
+and against the replica instance:
+
+#+RESULTS: replica-scale300-benchmark.sh
+#+begin_example
+pgbench (16.1)
+transaction type: <builtin: select only>
+scaling factor: 300
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 5150581
+number of failed transactions: 0 (0.000%)
+latency average = 1.164 ms
+initial connection time = 76.838 ms
+tps = 85874.008596 (without initial connection time)
+#+end_example
+
+Well, our PostgreSQL instances have the default configuration mostly,
+which means 128 MB of [[https://www.postgresql.org/docs/current/runtime-config-resource.html#RUNTIME-CONFIG-RESOURCE-MEMORY][shared buffers]]. Clearly not enough for to have
+performance close to the =tmpfs= replica in a ~4.5 GB
+database. Perhaps if I drop my OS [[https://www.thomas-krenn.com/en/wiki/Linux_Page_Cache_Basics][page cache]]?
+
+As =root=:
+#+NAME: free-page-cache.sh
+#+BEGIN_SRC sh  :dir /su:root@localhost: :results verbatim :outputs both :results verbatim :exports code
+  sync; echo 1 > /proc/sys/vm/drop_caches
+#+END_SRC
+
+#+RESULTS: free-page-cache.sh
+:                total        used        free      shared     buffers       cache   available
+: Mem:            15Gi       9.5Gi       1.3Gi       5.7Gi        22Mi        10Gi       6.0Gi
+: Swap:          8.0Gi       2.8Gi       5.2Gi
+:                total        used        free      shared     buffers       cache   available
+: Mem:            15Gi       9.5Gi       5.8Gi       5.7Gi       288Ki       6.3Gi       6.1Gi
+: Swap:          8.0Gi       2.8Gi       5.2Gi
+
+Benchmark once again versus the master instance:
+
+#+NAME: master-scale300-after-drop-caches-benchmark.sh
+#+BEGIN_SRC sh :dir /su:postgres@localhost: :results verbatim :exports results
+  pgbench --port=5432   \
+          --time=60     \
+          --client=100  \
+          --jobs=3      \
+          --select-only \
+          --no-vacuum   \
+          postgres
+#+END_SRC
+
+#+RESULTS: master-scale300-after-drop-caches-benchmark.sh
+#+begin_example
+pgbench (16.1)
+transaction type: <builtin: select only>
+scaling factor: 300
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 2037721
+number of failed transactions: 0 (0.000%)
+latency average = 2.943 ms
+initial connection time = 84.288 ms
+tps = 33976.877020 (without initial connection time)
+#+end_example
+
+Aha! About a third of the transactions per second (TPS).
+
+Let's run two more times in order and watch the OS cache do its job:
+
+#+NAME: master-scale300-after-drop-caches-second-time-benchmark.sh
+#+BEGIN_SRC sh :dir /su:postgres@localhost: :results verbatim :exports results
+  pgbench --port=5432   \
+          --time=60     \
+          --client=100  \
+          --jobs=3      \
+          --select-only \
+          --no-vacuum   \
+          postgres
+#+END_SRC
+
+#+RESULTS: master-scale300-after-drop-caches-second-time-benchmark.sh
+#+begin_example
+pgbench (16.1)
+transaction type: <builtin: select only>
+scaling factor: 300
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 4475925
+number of failed transactions: 0 (0.000%)
+latency average = 1.341 ms
+initial connection time = 70.050 ms
+tps = 74598.040075 (without initial connection time)
+#+end_example
+
+#+NAME: master-scale300-after-drop-caches-third-time-benchmark.sh
+#+BEGIN_SRC sh :dir /su:postgres@localhost: :results verbatim :exports results
+  pgbench --port=5432   \
+          --time=60     \
+          --client=100  \
+          --jobs=3      \
+          --select-only \
+          --no-vacuum   \
+          postgres
+#+END_SRC
+
+#+RESULTS: master-scale300-after-drop-caches-third-time-benchmark.sh
+#+begin_example
+pgbench (16.1)
+transaction type: <builtin: select only>
+scaling factor: 300
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 5070696
+number of failed transactions: 0 (0.000%)
+latency average = 1.183 ms
+initial connection time = 79.571 ms
+tps = 84538.387397 (without initial connection time)
+#+end_example
+
+Ok, now we are back at our starting TPS.
+
+* Closing thoughts
+
+It seems that on Linux at least, it does not make much sense to use
+=tmpfs=. If you have enough volatile memory allocate your whole
+database on a =tmpfs=, just run it on your persistent memory and let
+the OS + PostgreSQL handle caching!
+
+Also, please, tune your RDBMS. The bare minimum if you are clueless
+like me can be found here: https://pgtune.leopard.in.ua.

@@ -7,7 +7,7 @@ System (tmpfs) to store data in volatile memory instead of persisting
 data to your storage device. Intuitively you assume that this will
 always give us _*/BLAZINGLY FAST/*_ IO, right?
 
-* Chapter One: select-only
+* Context
 
 Say you have some small database (<500MB) and the workload on such
 database leans heavily on read side of operations.
@@ -37,7 +37,7 @@ Something like this:
 #+RESULTS:
 [[file:read-arch.svg]]
 
-** Setup
+* Setup
 
 Creating the master database.
 
@@ -134,7 +134,7 @@ As =postgres=:
 : waiting for server to start.... done
 : server started
 
-** Benchmark
+* Benchmark
 
 First, generate some data on the master instance as the =postgres= user:
 
@@ -169,7 +169,7 @@ We will be using the =select-only= built-in script for the benchmarks:
 SELECT abalance FROM pgbench_accounts WHERE aid = :aid;
 #+END_SRC
 
-Now, for some action, as the =postgres= user:
+Now, for some action, run as the =postgres= user:
 #+NAME: master-scale30-benchmark.sh
 #+BEGIN_SRC sh :dir /su:postgres@localhost: :results verbatim :exports both
   # change port to 5433 to run against the replica database
@@ -308,7 +308,6 @@ Let's check the master database size:
 | pgbench_history       | 0 bytes |
 #+END_EXAMPLE
 
-
 Let's run again the =select-only= benchmarks! Against the master
 instance:
 
@@ -371,23 +370,14 @@ tps = 85874.008596 (without initial connection time)
 #+end_example
 
 Well, our PostgreSQL instances have the default configuration mostly,
-which means 128 MB of [[https://www.postgresql.org/docs/current/runtime-config-resource.html#RUNTIME-CONFIG-RESOURCE-MEMORY][shared buffers]]. Clearly not enough for to have
-performance close to the =tmpfs= replica in a ~4.5 GB
-database. Perhaps if I drop my OS [[https://www.thomas-krenn.com/en/wiki/Linux_Page_Cache_Basics][page cache]]?
+which means 128 MB of [[https://www.postgresql.org/docs/current/runtime-config-resource.html#RUNTIME-CONFIG-RESOURCE-MEMORY][shared buffers]]. Clearly, it is not enough cache
+to perform on par with the =tmpfs= replica, considering the dataset
+size of ~4.5 GB. Perhaps if I drop my OS [[https://www.thomas-krenn.com/en/wiki/Linux_Page_Cache_Basics][page cache]]?
 
 As =root=:
-#+NAME: free-page-cache.sh
 #+BEGIN_SRC sh  :dir /su:root@localhost: :results verbatim :outputs both :results verbatim :exports code
   sync; echo 1 > /proc/sys/vm/drop_caches
 #+END_SRC
-
-#+RESULTS: free-page-cache.sh
-:                total        used        free      shared     buffers       cache   available
-: Mem:            15Gi       9.5Gi       1.3Gi       5.7Gi        22Mi        10Gi       6.0Gi
-: Swap:          8.0Gi       2.8Gi       5.2Gi
-:                total        used        free      shared     buffers       cache   available
-: Mem:            15Gi       9.5Gi       5.8Gi       5.7Gi       288Ki       6.3Gi       6.1Gi
-: Swap:          8.0Gi       2.8Gi       5.2Gi
 
 Benchmark once again versus the master instance:
 
@@ -483,10 +473,18 @@ Ok, now we are back at our starting TPS.
 
 * Closing thoughts
 
-It seems that on Linux at least, it does not make much sense to use
-=tmpfs=. If you have enough volatile memory allocate your whole
-database on a =tmpfs=, just run it on your persistent memory and let
-the OS + PostgreSQL handle caching!
+I don't know anything about other platforms such as Windows and MacOS
+(well, I know almost nothing about Linux too...), so I will emit my
+thoughts with a Linux + PostgreSQL combo in mind.
 
-Also, please, tune your RDBMS. The bare minimum if you are clueless
-like me can be found here: https://pgtune.leopard.in.ua.
+For long-running applications, it appears to be better to just let
+PostgreSQL and Linux handle caching. While you can still benefit from
+a steady number of TPS using =tmpfs= or =ramfs=, I would argue that it
+is probably easier to just have a normal setup.
+
+Now, for short-lived applications, such as running your integration
+tests, it may be an explendid option. I shall explore this topic in a
+later entry to this blog.
+
+Also, please, tune your RDBMS. If you are clueless like me, the bare
+minimum can be found here: https://pgtune.leopard.in.ua.

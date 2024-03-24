@@ -1,5 +1,5 @@
 #+TITLE: PostgreSQL + tmpfs
-#+OPTIONS: creator:nil author:nil date:nil toc:nil
+#+OPTIONS: creator:nil author:nil date:nil toc:nil html-postamble:nil
 #+PROPERTY: HEADER-ARGS+ :eval no-export
 
 I have heard a couple of times that you use Temporary File

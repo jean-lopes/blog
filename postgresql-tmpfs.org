@@ -2,7 +2,7 @@
 #+OPTIONS: creator:nil author:nil date:nil toc:nil
 #+PROPERTY: HEADER-ARGS+ :eval no-export
 
-I have heard heard a couple of times that you use Temporary File
+I have heard a couple of times that you use Temporary File
 System (tmpfs) to store data in volatile memory instead of persisting
 data to your storage device. Intuitively you assume that this will
 always give us _*/BLAZINGLY FAST/*_ IO, right?
@@ -17,7 +17,7 @@ replication with =tmpfs=?
 
 Something like this:
 
-#+BEGIN_SRC plantuml :file read-arch.png
+#+BEGIN_SRC plantuml :file read-arch.svg
   @startuml
   component SSD {
     database master
@@ -35,7 +35,7 @@ Something like this:
 #+END_SRC
 
 #+RESULTS:
-[[file:read-arch.png]]
+[[file:read-arch.svg]]
 
 ** Setup
 
@@ -284,7 +284,7 @@ Let's try with a slightly bigger dataset (10x bigger).
           postgres
 #+END_SRC
 
-Lets check the master database size:
+Let's check the master database size:
 
 #+NAME: database-size.sh
 #+BEGIN_SRC sql :engine postgres :cmdline "--no-psqlrc" :dbuser postgres :database postgres :port 5432 :exports verbatim :exports both
@@ -309,7 +309,7 @@ Lets check the master database size:
 #+END_EXAMPLE
 
 
-Lets run again the =select-only= benchmarks! Against the master
+Let's run again the =select-only= benchmarks! Against the master
 instance:
 
 #+NAME: master-scale300-benchmark.sh

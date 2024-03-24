@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2024-03-24 Sun 14:20 -->
+<!-- 2024-03-24 Sun 14:31 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>PostgreSQL + tmpfs</title>
@@ -203,8 +203,8 @@ data to your storage device. Intuitively you assume that this will
 always give us <span class="underline"><b><i>BLAZINGLY FAST</i></b></span> IO, right?
 </p>
 
-<div id="outline-container-orgf43167a" class="outline-2">
-<h2 id="orgf43167a"><span class="section-number-2">1.</span> Context</h2>
+<div id="outline-container-org3811bfb" class="outline-2">
+<h2 id="org3811bfb"><span class="section-number-2">1.</span> Context</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 Say you have some small database (&lt;500MB) and the workload on such
@@ -221,15 +221,15 @@ Something like this:
 </p>
 
 
-<div id="orga8719e1" class="figure">
+<div id="org085e0d0" class="figure">
 <p><img src="read-arch.svg" alt="read-arch.svg" class="org-svg" />
 </p>
 </div>
 </div>
 </div>
 
-<div id="outline-container-orgf0bff18" class="outline-2">
-<h2 id="orgf0bff18"><span class="section-number-2">2.</span> Setup</h2>
+<div id="outline-container-orgab85e25" class="outline-2">
+<h2 id="orgab85e25"><span class="section-number-2">2.</span> Setup</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 Creating the master database.
@@ -239,7 +239,7 @@ Creating the master database.
 As <code>postgres</code> user:
 </p>
 <div class="org-src-container">
-<pre class="src src-sh" id="org2faf6b0">mkdir --parents /var/lib/postgres/16/wal_archive
+<pre class="src src-sh" id="orgebb4c68">mkdir --parents /var/lib/postgres/16/wal_archive
 
 <span style="color: #9699a3;"># </span><span style="color: #9699a3;">Create database</span>
 initdb --auth-local=trust /var/lib/postgres/16/master
@@ -278,7 +278,7 @@ Creating the replica with tmpfs
 As <code>root</code>:
 </p>
 <div class="org-src-container">
-<pre class="src src-sh" id="orgf02f0fb">mkdir --parents /mnt/ramdisk
+<pre class="src src-sh" id="orgd8e1477">mkdir --parents /mnt/ramdisk
 mount --types tmpfs --options=<span style="color: #485e30;">'size=8192m,mode=0700'</span> tmpfs /mnt/ramdisk
 chown --recursive postgres:postgres /mnt/ramdisk
 </pre>
@@ -288,7 +288,7 @@ chown --recursive postgres:postgres /mnt/ramdisk
 As <code>postgres</code>:
 </p>
 <div class="org-src-container">
-<pre class="src src-sh" id="orgfca6518">pg_basebackup --write-recovery-conf <span style="color: #485e30;">\</span>
+<pre class="src src-sh" id="orgcdbb745">pg_basebackup --write-recovery-conf <span style="color: #485e30;">\</span>
               --pgdata=/mnt/ramdisk
 
 <span style="color: #9699a3;"># </span><span style="color: #9699a3;">Start the tmpfs replica on port 5433</span>
@@ -301,15 +301,15 @@ pg_ctl --pgdata=/mnt/ramdisk    <span style="color: #485e30;">\</span>
 </div>
 </div>
 
-<div id="outline-container-orgbe04eb2" class="outline-2">
-<h2 id="orgbe04eb2"><span class="section-number-2">3.</span> Benchmark</h2>
+<div id="outline-container-org9380fca" class="outline-2">
+<h2 id="org9380fca"><span class="section-number-2">3.</span> Benchmark</h2>
 <div class="outline-text-2" id="text-3">
 <p>
 First, generate some data on the master instance as the <code>postgres</code> user:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh" id="org2a6ca76">pgbench --port=5432    <span style="color: #485e30;">\</span>
+<pre class="src src-sh" id="org79a9991">pgbench --port=5432    <span style="color: #485e30;">\</span>
         --initialize   <span style="color: #485e30;">\</span>
         --foreign-keys <span style="color: #485e30;">\</span>
         --scale=30     <span style="color: #485e30;">\</span>
@@ -326,7 +326,7 @@ How many records did this generate?
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sql" id="org2c9a5da"><span style="color: #5a4a78;">select</span> to_char<span style="color: #5a4a78;">(</span><span style="color: #3e6968;">count</span><span style="color: #34548a;">(</span>*<span style="color: #34548a;">)</span>, <span style="color: #485e30;">'999,999,990'</span><span style="color: #5a4a78;">)</span> <span style="color: #5a4a78;">as</span> accounts <span style="color: #5a4a78;">from</span> pgbench_accounts;
+<pre class="src src-sql" id="org12b7029"><span style="color: #5a4a78;">select</span> to_char<span style="color: #5a4a78;">(</span><span style="color: #3e6968;">count</span><span style="color: #34548a;">(</span>*<span style="color: #34548a;">)</span>, <span style="color: #485e30;">'999,999,990'</span><span style="color: #5a4a78;">)</span> <span style="color: #5a4a78;">as</span> accounts <span style="color: #5a4a78;">from</span> pgbench_accounts;
 </pre>
 </div>
 
@@ -363,7 +363,7 @@ We will be using the <code>select-only</code> built-in script for the benchmarks
 Now, for some action, run as the <code>postgres</code> user:
 </p>
 <div class="org-src-container">
-<pre class="src src-sh" id="org2b28ea0"><span style="color: #9699a3;"># </span><span style="color: #9699a3;">change port to 5433 to run against the replica database</span>
+<pre class="src src-sh" id="orgde6e57a"><span style="color: #9699a3;"># </span><span style="color: #9699a3;">change port to 5433 to run against the replica database</span>
 pgbench --port=5432   <span style="color: #485e30;">\</span>
         --time=60     <span style="color: #485e30;">\</span>
         --client=100  <span style="color: #485e30;">\</span>
@@ -377,7 +377,7 @@ pgbench --port=5432   <span style="color: #485e30;">\</span>
 <p>
 Against the master instance:
 </p>
-<pre class="example" id="org9707bfa">
+<pre class="example" id="orga33aada">
 pgbench (16.1)
 transaction type: &lt;builtin: select only&gt;
 scaling factor: 30
@@ -396,7 +396,7 @@ tps = 90905.785932 (without initial connection time)
 <p>
 Against the replica instance:
 </p>
-<pre class="example" id="orgde08a82">
+<pre class="example" id="orgee0de3b">
 pgbench (16.1)
 transaction type: &lt;builtin: select only&gt;
 scaling factor: 30
@@ -424,7 +424,7 @@ Let's try with a slightly bigger dataset (10x bigger).
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh" id="org1a89275">pgbench --port=5432    <span style="color: #485e30;">\</span>
+<pre class="src src-sh" id="org1fe82a8">pgbench --port=5432    <span style="color: #485e30;">\</span>
         --initialize   <span style="color: #485e30;">\</span>
         --foreign-keys <span style="color: #485e30;">\</span>
         --scale=300    <span style="color: #485e30;">\</span>
@@ -437,7 +437,7 @@ Let's check the master database size:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sql" id="org1bbb1b3"><span style="color: #5a4a78;">select</span> relname
+<pre class="src src-sql" id="orgc905220"><span style="color: #5a4a78;">select</span> relname
      , pg_size_pretty<span style="color: #5a4a78;">(</span>pg_relation_size<span style="color: #34548a;">(</span>cl.oid<span style="color: #34548a;">)</span><span style="color: #5a4a78;">)</span> <span style="color: #5a4a78;">as</span> "<span style="color: #5a4a78;">size</span>"
   <span style="color: #5a4a78;">from</span> pg_class cl
  <span style="color: #5a4a78;">where</span> cl.relnamespace = <span style="color: #485e30;">'public'</span>::regnamespace
@@ -445,7 +445,7 @@ Let's check the master database size:
 </pre>
 </div>
 
-<pre class="example" id="org8aa0f38">
+<pre class="example" id="orga22880d">
 | relname               | size    |
 |-----------------------+---------|
 | pgbench_accounts      | 3842 MB |
@@ -462,7 +462,7 @@ Let's run again the <code>select-only</code> benchmarks! Against the master
 instance:
 </p>
 
-<pre class="example" id="orgdde44f9">
+<pre class="example" id="org39e0e67">
 pgbench (16.1)
 transaction type: &lt;builtin: select only&gt;
 scaling factor: 300
@@ -482,7 +482,7 @@ tps = 85832.914187 (without initial connection time)
 and against the replica instance:
 </p>
 
-<pre class="example" id="org0d0d10a">
+<pre class="example" id="org6244eed">
 pgbench (16.1)
 transaction type: &lt;builtin: select only&gt;
 scaling factor: 300
@@ -517,7 +517,7 @@ As <code>root</code>:
 Benchmark once again versus the master instance:
 </p>
 
-<pre class="example" id="org4b59699">
+<pre class="example" id="org68a49ae">
 pgbench (16.1)
 transaction type: &lt;builtin: select only&gt;
 scaling factor: 300
@@ -541,7 +541,7 @@ Aha! About a third of the transactions per second (TPS).
 Let's run two more times in order and watch the OS cache do its job:
 </p>
 
-<pre class="example" id="org95c1962">
+<pre class="example" id="org32b8345">
 pgbench (16.1)
 transaction type: &lt;builtin: select only&gt;
 scaling factor: 300
@@ -557,7 +557,7 @@ initial connection time = 70.050 ms
 tps = 74598.040075 (without initial connection time)
 </pre>
 
-<pre class="example" id="org79e74cb">
+<pre class="example" id="org5da90e2">
 pgbench (16.1)
 transaction type: &lt;builtin: select only&gt;
 scaling factor: 300
@@ -579,8 +579,8 @@ Ok, now we are back at our starting TPS.
 </div>
 </div>
 
-<div id="outline-container-org1ee5e5e" class="outline-2">
-<h2 id="org1ee5e5e"><span class="section-number-2">4.</span> Closing thoughts</h2>
+<div id="outline-container-org3108345" class="outline-2">
+<h2 id="org3108345"><span class="section-number-2">4.</span> Closing thoughts</h2>
 <div class="outline-text-2" id="text-4">
 <p>
 I don't know anything about other platforms such as Windows and MacOS
@@ -604,6 +604,10 @@ later entry to this blog.
 <p>
 Also, please, tune your RDBMS. If you are clueless like me, the bare
 minimum can be found here: <a href="https://pgtune.leopard.in.ua">https://pgtune.leopard.in.ua</a>.
+</p>
+
+<p>
+If you want to contact me about this post, do so via this <a href="https://github.com/jean-lopes/blog/discussions/1">discussion</a>.
 </p>
 </div>
 </div>

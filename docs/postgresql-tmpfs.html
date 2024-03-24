@@ -1,0 +1,601 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2024-03-23 Sat 22:33 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PostgreSQL + tmpfs</title>
+<meta name="generator" content="Org Mode" />
+<style>
+  #content { max-width: 60em; margin: auto; }
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #e6e6e6;
+    border-radius: 3px;
+    background-color: #f2f2f2;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: auto;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    top: -8px;
+    right: 12px;
+    padding: 3px;
+    color: #555;
+    background-color: #f2f2f299;
+  }
+  pre.src:hover:before { display: inline; margin-top: 14px;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-authinfo::before { content: 'Authinfo'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .equation-container {
+    display: table;
+    text-align: center;
+    width: 100%;
+  }
+  .equation {
+    vertical-align: middle;
+  }
+  .equation-label {
+    display: table-cell;
+    text-align: right;
+    vertical-align: middle;
+  }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { }
+</style>
+</head>
+<body>
+<div id="content" class="content">
+<h1 class="title">PostgreSQL + tmpfs</h1>
+<p>
+I have heard heard a couple of times that you use Temporary File
+System (tmpfs) to store data in volatile memory instead of persisting
+data to your storage device. Intuitively you assume that this will
+always give us <span class="underline"><b><i>BLAZINGLY FAST</i></b></span> IO, right?
+</p>
+
+<div id="outline-container-org9e3ed40" class="outline-2">
+<h2 id="org9e3ed40"><span class="section-number-2">1.</span> Chapter One: select-only</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+Say you have some small database (&lt;500MB) and the workload on such
+database leans heavily on read side of operations.
+</p>
+
+<p>
+I thought to myself, what if we spin a read-only replica via streaming
+replication with <code>tmpfs</code>?
+</p>
+
+<p>
+Something like this:
+</p>
+
+
+<div id="org552f402" class="figure">
+<p><img src="read-arch.png" alt="read-arch.png" />
+</p>
+</div>
+</div>
+
+<div id="outline-container-org2490862" class="outline-3">
+<h3 id="org2490862"><span class="section-number-3">1.1.</span> Setup</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+Creating the master database.
+</p>
+
+<p>
+As <code>postgres</code> user:
+</p>
+<div class="org-src-container">
+<pre class="src src-sh" id="org36a8223">mkdir --parents /var/lib/postgres/16/wal_archive
+
+<span style="color: #9699a3;"># </span><span style="color: #9699a3;">Create database</span>
+initdb --auth-local=trust /var/lib/postgres/16/master
+
+<span style="color: #9699a3;"># </span><span style="color: #9699a3;">Helper function to edit postgresql.conf</span>
+<span style="color: #5a4a78;">function</span> <span style="color: #34548a;">set_prop</span><span style="color: #5a4a78;">()</span> <span style="color: #5a4a78;">{</span> <span style="color: #485e30;">\</span>
+  sed --regexp-extended <span style="color: #485e30;">\</span>
+      --in-place <span style="color: #485e30;">\</span>
+      <span style="color: #485e30;">"s,^#$1.*?$,$1 = $2,gI"</span> <span style="color: #485e30;">\</span>
+      /var/lib/postgres/16/master/postgresql.conf; <span style="color: #485e30;">\</span>
+<span style="color: #5a4a78;">}</span>
+
+<span style="color: #9699a3;"># </span><span style="color: #9699a3;">Edit relevant postgresql.conf properties</span>
+set_prop wal_level replica
+set_prop archive_mode on
+set_prop archive_command <span style="color: #485e30;">"'test ! -f /var/lib/postgres/16/wal_archive/%f \&amp;\&amp; cp %p /var/lib/postgres/16/wal_archive/%f'"</span>
+set_prop restore_command <span style="color: #485e30;">"'cp /var/lib/postgres/16/wal_archive/%f %p'"</span>
+set_prop archive_cleanup_command <span style="color: #485e30;">"'pg_archivecleanup /var/lib/postgres/16/wal_archive %r'"</span>
+set_prop primary_conninfo <span style="color: #485e30;">"'host=localhost port=5432 user=replicator'"</span>
+
+<span style="color: #9699a3;"># </span><span style="color: #9699a3;">Start RDBMS</span>
+pg_ctl --pgdata=/var/lib/postgres/16/master <span style="color: #485e30;">\</span>
+       --log=/var/lib/postgres/16/master/log <span style="color: #485e30;">\</span>
+       start
+
+<span style="color: #9699a3;"># </span><span style="color: #9699a3;">Create replication user</span>
+createuser --replication replicator
+</pre>
+</div>
+
+<p>
+Creating the replica with tmpfs
+</p>
+
+<p>
+As <code>root</code>:
+</p>
+<div class="org-src-container">
+<pre class="src src-sh" id="org8747a50">mkdir --parents /mnt/ramdisk
+mount --types tmpfs --options=<span style="color: #485e30;">'size=8192m,mode=0700'</span> tmpfs /mnt/ramdisk
+chown --recursive postgres:postgres /mnt/ramdisk
+</pre>
+</div>
+
+<p>
+As <code>postgres</code>:
+</p>
+<div class="org-src-container">
+<pre class="src src-sh" id="org55fe271">pg_basebackup --write-recovery-conf <span style="color: #485e30;">\</span>
+              --pgdata=/mnt/ramdisk
+
+<span style="color: #9699a3;"># </span><span style="color: #9699a3;">Start the tmpfs replica on port 5433</span>
+pg_ctl --pgdata=/mnt/ramdisk    <span style="color: #485e30;">\</span>
+       --options=<span style="color: #485e30;">'-c port=5433'</span> <span style="color: #485e30;">\</span>
+       --log=/mnt/ramdisk/log   <span style="color: #485e30;">\</span>
+       start
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgaa30460" class="outline-3">
+<h3 id="orgaa30460"><span class="section-number-3">1.2.</span> Benchmark</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+First, generate some data on the master instance as the <code>postgres</code> user:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh" id="org0b7be26">pgbench --port=5432    <span style="color: #485e30;">\</span>
+        --initialize   <span style="color: #485e30;">\</span>
+        --foreign-keys <span style="color: #485e30;">\</span>
+        --scale=30     <span style="color: #485e30;">\</span>
+        postgres
+</pre>
+</div>
+
+<p>
+see: <a href="https://www.postgresql.org/docs/current/pgbench.html">https://www.postgresql.org/docs/current/pgbench.html</a>
+</p>
+
+<p>
+How many records did this generate?
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sql" id="org8e8b8e6"><span style="color: #5a4a78;">select</span> to_char<span style="color: #5a4a78;">(</span><span style="color: #3e6968;">count</span><span style="color: #34548a;">(</span>*<span style="color: #34548a;">)</span>, <span style="color: #485e30;">'999,999,990'</span><span style="color: #5a4a78;">)</span> <span style="color: #5a4a78;">as</span> accounts <span style="color: #5a4a78;">from</span> pgbench_accounts;
+</pre>
+</div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">accounts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">3,000,000</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+We will be using the <code>select-only</code> built-in script for the benchmarks:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sql"><span style="color: #9699a3;">-- </span><span style="color: #9699a3;">select-only: &lt;builtin: select only&gt;</span>
+<span style="color: #4c505e;">\set aid random</span><span style="color: #5a4a78;">(</span><span style="color: #4c505e;">1, 100000 * :scale</span><span style="color: #5a4a78;">)</span>
+<span style="color: #5a4a78;">SELECT</span> abalance <span style="color: #5a4a78;">FROM</span> pgbench_accounts <span style="color: #5a4a78;">WHERE</span> aid = :aid;
+</pre>
+</div>
+
+<p>
+Now, for some action, as the <code>postgres</code> user:
+</p>
+<div class="org-src-container">
+<pre class="src src-sh" id="org871c0cd"><span style="color: #9699a3;"># </span><span style="color: #9699a3;">change port to 5433 to run against the replica database</span>
+pgbench --port=5432   <span style="color: #485e30;">\</span>
+        --time=60     <span style="color: #485e30;">\</span>
+        --client=100  <span style="color: #485e30;">\</span>
+        --jobs=3      <span style="color: #485e30;">\</span>
+        --select-only <span style="color: #485e30;">\</span>
+        --no-vacuum   <span style="color: #485e30;">\</span>
+        postgres
+</pre>
+</div>
+
+<p>
+Against the master instance:
+</p>
+<pre class="example" id="org679e361">
+pgbench (16.1)
+transaction type: &lt;builtin: select only&gt;
+scaling factor: 30
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 5453634
+number of failed transactions: 0 (0.000%)
+latency average = 1.100 ms
+initial connection time = 74.276 ms
+tps = 90905.785932 (without initial connection time)
+</pre>
+
+<p>
+Against the replica instance:
+</p>
+<pre class="example" id="orgbfc6cde">
+pgbench (16.1)
+transaction type: &lt;builtin: select only&gt;
+scaling factor: 30
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 5506013
+number of failed transactions: 0 (0.000%)
+latency average = 1.089 ms
+initial connection time = 74.259 ms
+tps = 91793.918172 (without initial connection time)
+</pre>
+
+<p>
+Well, that is a surprise (for me at least). I was expecting the
+<code>tmpfs</code> to outperform the master database by a moderate/large
+margin. It seems the PostgreSQL + Operating System (OS) caches are
+doing a great job.
+</p>
+
+<p>
+Let's try with a slightly bigger dataset (10x bigger).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh" id="orgf05195f">pgbench --port=5432    <span style="color: #485e30;">\</span>
+        --initialize   <span style="color: #485e30;">\</span>
+        --foreign-keys <span style="color: #485e30;">\</span>
+        --scale=300    <span style="color: #485e30;">\</span>
+        postgres
+</pre>
+</div>
+
+<p>
+Lets check the master database size:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sql" id="org340a27b"><span style="color: #5a4a78;">select</span> relname
+     , pg_size_pretty<span style="color: #5a4a78;">(</span>pg_relation_size<span style="color: #34548a;">(</span>cl.<span style="color: #166775;">oid</span><span style="color: #34548a;">)</span><span style="color: #5a4a78;">)</span> <span style="color: #5a4a78;">as</span> "<span style="color: #3e6968;">size</span>"
+  <span style="color: #5a4a78;">from</span> pg_class cl
+ <span style="color: #5a4a78;">where</span> cl.relnamespace = <span style="color: #485e30;">'public'</span>::regnamespace
+ <span style="color: #5a4a78;">order</span> <span style="color: #3e6968;">by</span> pg_relation_size<span style="color: #5a4a78;">(</span>cl.<span style="color: #166775;">oid</span><span style="color: #5a4a78;">)</span> <span style="color: #5a4a78;">desc</span>
+</pre>
+</div>
+
+<pre class="example" id="org30cf750">
+| relname               | size    |
+|-----------------------+---------|
+| pgbench_accounts      | 3842 MB |
+| pgbench_accounts_pkey | 643 MB  |
+| pgbench_tellers       | 136 kB  |
+| pgbench_tellers_pkey  | 88 kB   |
+| pgbench_branches_pkey | 16 kB   |
+| pgbench_branches      | 16 kB   |
+| pgbench_history       | 0 bytes |
+</pre>
+
+
+<p>
+Lets run again the <code>select-only</code> benchmarks! Against the master
+instance:
+</p>
+
+<pre class="example" id="orgcf1bf5b">
+pgbench (16.1)
+transaction type: &lt;builtin: select only&gt;
+scaling factor: 300
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 5146134
+number of failed transactions: 0 (0.000%)
+latency average = 1.165 ms
+initial connection time = 86.478 ms
+tps = 85832.914187 (without initial connection time)
+</pre>
+
+<p>
+and against the replica instance:
+</p>
+
+<pre class="example" id="org8330e45">
+pgbench (16.1)
+transaction type: &lt;builtin: select only&gt;
+scaling factor: 300
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 5150581
+number of failed transactions: 0 (0.000%)
+latency average = 1.164 ms
+initial connection time = 76.838 ms
+tps = 85874.008596 (without initial connection time)
+</pre>
+
+<p>
+Well, our PostgreSQL instances have the default configuration mostly,
+which means 128 MB of <a href="https://www.postgresql.org/docs/current/runtime-config-resource.html#RUNTIME-CONFIG-RESOURCE-MEMORY">shared buffers</a>. Clearly not enough for to have
+performance close to the <code>tmpfs</code> replica in a ~4.5 GB
+database. Perhaps if I drop my OS <a href="https://www.thomas-krenn.com/en/wiki/Linux_Page_Cache_Basics">page cache</a>?
+</p>
+
+<p>
+As <code>root</code>:
+</p>
+<div class="org-src-container">
+<pre class="src src-sh" id="orgc891570">sync; <span style="color: #3e6968;">echo</span> 1 &gt; /proc/sys/vm/drop_caches
+</pre>
+</div>
+
+<p>
+Benchmark once again versus the master instance:
+</p>
+
+<pre class="example" id="org7601845">
+pgbench (16.1)
+transaction type: &lt;builtin: select only&gt;
+scaling factor: 300
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 2037721
+number of failed transactions: 0 (0.000%)
+latency average = 2.943 ms
+initial connection time = 84.288 ms
+tps = 33976.877020 (without initial connection time)
+</pre>
+
+<p>
+Aha! About a third of the transactions per second (TPS).
+</p>
+
+<p>
+Let's run two more times in order and watch the OS cache do its job:
+</p>
+
+<pre class="example" id="org2a75901">
+pgbench (16.1)
+transaction type: &lt;builtin: select only&gt;
+scaling factor: 300
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 4475925
+number of failed transactions: 0 (0.000%)
+latency average = 1.341 ms
+initial connection time = 70.050 ms
+tps = 74598.040075 (without initial connection time)
+</pre>
+
+<pre class="example" id="org4341040">
+pgbench (16.1)
+transaction type: &lt;builtin: select only&gt;
+scaling factor: 300
+query mode: simple
+number of clients: 100
+number of threads: 3
+maximum number of tries: 1
+duration: 60 s
+number of transactions actually processed: 5070696
+number of failed transactions: 0 (0.000%)
+latency average = 1.183 ms
+initial connection time = 79.571 ms
+tps = 84538.387397 (without initial connection time)
+</pre>
+
+<p>
+Ok, now we are back at our starting TPS.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org4713ef8" class="outline-2">
+<h2 id="org4713ef8"><span class="section-number-2">2.</span> Closing thoughts</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+It seems that on Linux at least, it does not make much sense to use
+<code>tmpfs</code>. If you have enough volatile memory allocate your whole
+database on a <code>tmpfs</code>, just run it on your persistent memory and let
+the OS + PostgreSQL handle caching!
+</p>
+
+<p>
+Also, please, tune your RDBMS. The bare minimum if you are clueless
+like me can be found here: <a href="https://pgtune.leopard.in.ua">https://pgtune.leopard.in.ua</a>.
+</p>
+</div>
+</div>
+</div>
+</body>
+</html>

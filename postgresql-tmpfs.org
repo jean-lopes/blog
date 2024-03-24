@@ -488,3 +488,5 @@ later entry to this blog.
 
 Also, please, tune your RDBMS. If you are clueless like me, the bare
 minimum can be found here: https://pgtune.leopard.in.ua.
+
+If you want to contact me about this post, do so via this [[https://github.com/jean-lopes/blog/discussions/1][discussion]].

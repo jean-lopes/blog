@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rate-limiting</title>
+<meta name="generator" content="Org Mode" />
+</head>
+<body>
+<div id="content" class="content">
+<h1 class="title">Rate-limiting</h1>
+<p>
+Ever needed to rate-limit inserts? Did you consider letting your
+source of truth, the database, enforce it for you? I did. Let’s
+explore one unconventional but elegant<sup><i>[citation needed]</i></sup> approach.
+</p>
+
+<p>
+My workload is strictly insert-only: only <code>SELECT</code> and <code>INSERT</code>, never
+<code>UPDATE</code> or <code>DELETE</code>. The rate limit is equally simple, a fixed
+minimum interval (cooldown) between inserts from the same user.
+</p>
+
+<p>
+Imagine a table called <code>message</code> that stores chat messages sent by
+users. A minimal DDL might look like this:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sql"><span style="color: #0031a9;">create</span> <span style="color: #0031a9;">table</span> <span style="color: #602938;">message</span> (
+  user_id  text        <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>,
+  content  text        <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>,
+  sent_at  timestamptz <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>
+);
+</pre>
+</div>
+
+<p>
+Any suggestions are welcome, but I’m primarily interested in feedback
+related to the rate-limiting part.
+</p>
+
+<p>
+A straightforward solution is a <code>BEFORE INSERT</code> trigger that checks
+whether the user is still on cooldown. I’m not a simple man though,
+so here we are.
+</p>
+
+<p>
+Can we enforce the cooldown without an explicit check? Yes, by
+combining two powerful PostgreSQL features:
+</p>
+
+<ul class="org-ul">
+<li><a href="https://www.postgresql.org/docs/current/rangetypes.html">Range types</a> (specifically <code>tstzrange</code>)</li>
+<li>Exclusion constraints backed by a GiST index</li>
+</ul>
+
+<p>
+Exclusion constraints guarantee that no two rows have overlapping
+values for the specified expression(s). PostgreSQL 18 made the syntax
+for “no overlaps” much cleaner with the <code>WITHOUT OVERLAPS</code> clause.
+</p>
+
+<p>
+The idea is simple: give each message a half-open time range
+<code>[now(), now() + cooldown)</code> that belongs exclusively to that user.
+Because the exclusion constraint prevents overlapping ranges for the
+same <code>user_id</code>, a second insert within the cooldown window is rejected
+at the constraint level, no trigger required.
+</p>
+
+<p>
+Here’s the complete DDL:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sql"><span style="color: #0031a9;">drop</span> <span style="color: #0031a9;">table</span> <span style="color: #602938;">if</span> <span style="color: #0031a9;">exists</span> message;
+
+<span style="color: #0031a9;">create</span> <span style="color: #0031a9;">table</span> <span style="color: #602938;">message</span> (
+  user_id         text        <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>,
+  content         text        <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>,
+  sent_at         timestamptz <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span> <span style="color: #0031a9;">default</span> now(),
+  cooldown_period tstzrange   <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span> <span style="color: #0031a9;">default</span> tstzrange(now(), now() + <span style="color: #306010;">interval</span> <span style="color: #00598b;">'30 seconds'</span>, <span style="color: #00598b;">'[)'</span>),
+
+  <span style="color: #0031a9;">unique</span> (user_id, cooldown_period <span style="color: #0031a9;">without</span> <span style="color: #0031a9;">overlaps</span>)
+);
+</pre>
+</div>
+
+<p>
+(pre-18 syntax would have been <code>EXCLUDE USING gist (user_id WITH =, cooldown_period WITH &amp;&amp;)</code>)
+</p>
+
+<p>
+Let’s test it:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sql"><span style="color: #0031a9;">insert</span> <span style="color: #0031a9;">into</span> message (user_id, content)
+<span style="color: #0031a9;">values</span> (<span style="color: #00598b;">'bananilson'</span>, <span style="color: #00598b;">'nada acontece feijoada'</span>);
+
+<span style="color: #7f0000;">-- </span><span style="color: #7f0000;">this second insert happens immediately, still inside the 30-second window
+</span><span style="color: #0031a9;">insert</span> <span style="color: #0031a9;">into</span> message (user_id, content)
+<span style="color: #0031a9;">values</span> (<span style="color: #00598b;">'bananilson'</span>, <span style="color: #00598b;">'supimpa'</span>);
+</pre>
+</div>
+
+<p>
+The second insert fails with:
+</p>
+
+<pre class="example" id="org19c0c49">
+ERROR:  conflicting key value violates exclusion constraint "message_user_id_cooldown_period_key"
+DETAIL:  Key (user_id, cooldown_period)=(bananilson, ["2025-12-13 19:29:35.503712+00","2025-12-13 19:30:05.503712+00")) conflicts with existing key (user_id, cooldown_period)=(bananilson, ["2025-12-13 19:29:35.501992+00","2025-12-13 19:30:05.501992+00")).
+</pre>
+
+<p>
+After 30 seconds (or whatever interval you choose), the next message
+from the same user succeeds again.
+</p>
+
+<p>
+That’s it! With a single declarative constraint we get:
+</p>
+
+<ul class="org-ul">
+<li>Atomic, race-condition-free rate limiting;</li>
+<li>No application-level locking or querying;</li>
+<li>Enforcement at the only true source of truth.</li>
+</ul>
+
+<p>
+That's all, folks.
+</p>
+</div>
+<div id="postamble" class="status">
+<p class="date">Date: 2025-12-12</p>
+</div>
+</body>
+</html>

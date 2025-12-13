@@ -1,0 +1,91 @@
+#+TITLE: Rate-limiting
+#+DATE: 2025-12-12
+#+PROPERTY: header-args:sql :engine postgres :dbuser postgres :dbhost localhost :dbport 5432 :database postgres :cmdline "--quiet --no-psqlrc" :results value table
+
+Ever needed to rate-limit inserts? Did you consider letting your
+source of truth, the database, enforce it for you? I did. Let’s
+explore one unconventional but elegant^{/[citation needed]/} approach.
+
+My workload is strictly insert-only: only =SELECT= and =INSERT=, never
+=UPDATE= or =DELETE=. The rate limit is equally simple, a fixed
+minimum interval (cooldown) between inserts from the same user.
+
+Imagine a table called =message= that stores chat messages sent by
+users. A minimal DDL might look like this:
+
+#+BEGIN_SRC sql :results silent
+  create table message (
+    user_id  text        not null,
+    content  text        not null,
+    sent_at  timestamptz not null
+  );
+#+END_SRC
+
+Any suggestions are welcome, but I’m primarily interested in feedback
+related to the rate-limiting part.
+
+A straightforward solution is a =BEFORE INSERT= trigger that checks
+whether the user is still on cooldown. I’m not a simple man though,
+so here we are.
+
+Can we enforce the cooldown without an explicit check? Yes, by
+combining two powerful PostgreSQL features:
+
+- [[https://www.postgresql.org/docs/current/rangetypes.html][Range types]] (specifically =tstzrange=)
+- Exclusion constraints backed by a GiST index
+
+Exclusion constraints guarantee that no two rows have overlapping
+values for the specified expression(s). PostgreSQL 18 made the syntax
+for “no overlaps” much cleaner with the =WITHOUT OVERLAPS= clause.
+
+The idea is simple: give each message a half-open time range
+=[now(), now() + cooldown)= that belongs exclusively to that user.
+Because the exclusion constraint prevents overlapping ranges for the
+same =user_id=, a second insert within the cooldown window is rejected
+at the constraint level, no trigger required.
+
+Here’s the complete DDL:
+
+#+BEGIN_SRC sql :results silent
+  drop table if exists message;
+
+  create table message (
+    user_id         text        not null,
+    content         text        not null,
+    sent_at         timestamptz not null default now(),
+    cooldown_period tstzrange   not null default tstzrange(now(), now() + interval '30 seconds', '[)'),
+
+    unique (user_id, cooldown_period without overlaps)
+  );
+#+END_SRC
+
+(pre-18 syntax would have been =EXCLUDE USING gist (user_id WITH =, cooldown_period WITH &&)=)
+
+Let’s test it:
+
+#+BEGIN_SRC sql :results silent
+  insert into message (user_id, content)
+  values ('bananilson', 'nada acontece feijoada');
+
+  -- this second insert happens immediately, still inside the 30-second window
+  insert into message (user_id, content)
+  values ('bananilson', 'supimpa');
+#+END_SRC
+
+The second insert fails with:
+
+#+BEGIN_EXAMPLE
+ERROR:  conflicting key value violates exclusion constraint "message_user_id_cooldown_period_key"
+DETAIL:  Key (user_id, cooldown_period)=(bananilson, ["2025-12-13 19:29:35.503712+00","2025-12-13 19:30:05.503712+00")) conflicts with existing key (user_id, cooldown_period)=(bananilson, ["2025-12-13 19:29:35.501992+00","2025-12-13 19:30:05.501992+00")).
+#+END_EXAMPLE
+
+After 30 seconds (or whatever interval you choose), the next message
+from the same user succeeds again.
+
+That’s it! With a single declarative constraint we get:
+
+- Atomic, race-condition-free rate limiting;
+- No application-level locking or querying;
+- Enforcement at the only true source of truth.
+
+That's all, folks.

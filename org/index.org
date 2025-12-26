@@ -2,3 +2,4 @@
 #+OPTIONS: toc:nil num:nil
 
 - [[file:rate-limiting.org][Rate limiting]]
+- [[file:rate-limiting-bursty-workloads/post.org][Rate limiting bursty workloads]]

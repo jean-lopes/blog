@@ -3,7 +3,7 @@ name: rate-limiting-bursty-workloads
 services:
   pg:
     build:
-      dockerfile: Dockerfile
+      dockerfile: postgres.Dockerfile
     container_name: pg
     restart: no
     environment:

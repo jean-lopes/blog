@@ -1,4 +1,4 @@
-#+TITLE: Rate-limiting
+#+TITLE: Rate limiting
 #+DATE: 2025-12-12
 #+PROPERTY: header-args:sql :engine postgres :dbuser postgres :dbhost localhost :dbport 5432 :database postgres :cmdline "--quiet --no-psqlrc" :results value table
 
@@ -20,9 +20,6 @@ users. A minimal DDL might look like this:
     sent_at  timestamptz not null
   );
 #+END_SRC
-
-Any suggestions are welcome, but I’m primarily interested in feedback
-related to the rate-limiting part.
 
 A straightforward solution is a =BEFORE INSERT= trigger that checks
 whether the user is still on cooldown. I’m not a simple man though,

@@ -128,7 +128,7 @@ configuration makes me wonder why some (NoSQL) database systems
 have such widespread adoption.
 
 If you are wondering about how to run this yourself, download this files:
-- [[file:Dockerfile][Dockerfile]]
+- [[file:postgres.Dockerfile][postgres.Dockerfile]]
 - [[file:init.sql][init.sql]]
 - [[file:insert.sql][insert.sql]]
 - [[file:docker-compose.yml][docker-compose.yml]]

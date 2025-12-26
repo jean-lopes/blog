@@ -19,7 +19,7 @@
                                         :time-stamp-file nil)
                                        ("static"
                                         :base-directory "org/"
-                                        :base-extension "any"
+                                        :base-extension "dockerfile\\|sql\\|png\\|yml"
                                         :publishing-directory "docs/"
                                         :publishing-function org-publish-attachment
                                         :recursive t

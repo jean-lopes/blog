@@ -1,16 +1,14 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Rate-limiting</title>
+<title>Rate limiting</title>
 <meta name="generator" content="Org Mode" />
 </head>
 <body>
 <div id="content" class="content">
-<h1 class="title">Rate-limiting</h1>
+<h1 class="title">Rate limiting</h1>
 <p>
 Ever needed to rate-limit inserts? Did you consider letting your
 source of truth, the database, enforce it for you? I did. Let’s
@@ -29,18 +27,13 @@ users. A minimal DDL might look like this:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sql"><span style="color: #0031a9;">create</span> <span style="color: #0031a9;">table</span> <span style="color: #602938;">message</span> (
-  user_id  text        <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>,
-  content  text        <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>,
-  sent_at  timestamptz <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>
-);
+<pre class="src src-sql">  <span style="color: #0031a9;">create</span> <span style="color: #0031a9;">table</span> <span style="color: #602938;">message</span> (
+    user_id  <span style="color: #306010;">text</span>        <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>,
+    <span style="color: #721045;">content</span>  <span style="color: #306010;">text</span>        <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>,
+    sent_at  <span style="color: #306010;">timestamptz</span> <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>
+  );
 </pre>
 </div>
-
-<p>
-Any suggestions are welcome, but I’m primarily interested in feedback
-related to the rate-limiting part.
-</p>
 
 <p>
 A straightforward solution is a <code>BEFORE INSERT</code> trigger that checks
@@ -77,16 +70,16 @@ Here’s the complete DDL:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sql"><span style="color: #0031a9;">drop</span> <span style="color: #0031a9;">table</span> <span style="color: #602938;">if</span> <span style="color: #0031a9;">exists</span> message;
+<pre class="src src-sql">  <span style="color: #721045;">drop</span> <span style="color: #0031a9;">table</span> <span style="color: #721045;">if</span> <span style="color: #721045;">exists</span> message;
 
-<span style="color: #0031a9;">create</span> <span style="color: #0031a9;">table</span> <span style="color: #602938;">message</span> (
-  user_id         text        <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>,
-  content         text        <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>,
-  sent_at         timestamptz <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span> <span style="color: #0031a9;">default</span> now(),
-  cooldown_period tstzrange   <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span> <span style="color: #0031a9;">default</span> tstzrange(now(), now() + <span style="color: #306010;">interval</span> <span style="color: #00598b;">'30 seconds'</span>, <span style="color: #00598b;">'[)'</span>),
+  <span style="color: #0031a9;">create</span> <span style="color: #0031a9;">table</span> <span style="color: #602938;">message</span> (
+    user_id         <span style="color: #306010;">text</span>        <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>,
+    <span style="color: #721045;">content</span>         <span style="color: #306010;">text</span>        <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span>,
+    sent_at         <span style="color: #306010;">timestamptz</span> <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span> <span style="color: #0031a9;">default</span> now(),
+    cooldown_period <span style="color: #306010;">tstzrange</span>   <span style="color: #0031a9;">not</span> <span style="color: #0031a9;">null</span> <span style="color: #0031a9;">default</span> <span style="color: #306010;">tstzrange</span>(now(), now() + <span style="color: #306010;">interval</span> <span style="color: #00598b;">'30 seconds'</span>, <span style="color: #00598b;">'[)'</span>),
 
-  <span style="color: #0031a9;">unique</span> (user_id, cooldown_period <span style="color: #0031a9;">without</span> <span style="color: #0031a9;">overlaps</span>)
-);
+    <span style="color: #0031a9;">unique</span> (user_id, cooldown_period <span style="color: #721045;">without</span> <span style="color: #0031a9;">overlaps</span>)
+  );
 </pre>
 </div>
 
@@ -99,12 +92,12 @@ Let’s test it:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sql"><span style="color: #0031a9;">insert</span> <span style="color: #0031a9;">into</span> message (user_id, content)
-<span style="color: #0031a9;">values</span> (<span style="color: #00598b;">'bananilson'</span>, <span style="color: #00598b;">'nada acontece feijoada'</span>);
+<pre class="src src-sql">  <span style="color: #721045;">insert</span> <span style="color: #0031a9;">into</span> message (user_id, <span style="color: #721045;">content</span>)
+  <span style="color: #721045;">values</span> (<span style="color: #00598b;">'bananilson'</span>, <span style="color: #00598b;">'nada acontece feijoada'</span>);
 
-<span style="color: #7f0000;">-- </span><span style="color: #7f0000;">this second insert happens immediately, still inside the 30-second window
-</span><span style="color: #0031a9;">insert</span> <span style="color: #0031a9;">into</span> message (user_id, content)
-<span style="color: #0031a9;">values</span> (<span style="color: #00598b;">'bananilson'</span>, <span style="color: #00598b;">'supimpa'</span>);
+  <span style="color: #7f0000;">-- </span><span style="color: #7f0000;">this second insert happens immediately, still inside the 30-second window
+</span>  <span style="color: #721045;">insert</span> <span style="color: #0031a9;">into</span> message (user_id, <span style="color: #721045;">content</span>)
+  <span style="color: #721045;">values</span> (<span style="color: #00598b;">'bananilson'</span>, <span style="color: #00598b;">'supimpa'</span>);
 </pre>
 </div>
 
@@ -112,7 +105,7 @@ Let’s test it:
 The second insert fails with:
 </p>
 
-<pre class="example" id="org19c0c49">
+<pre class="example" id="org6ea0ac0">
 ERROR:  conflicting key value violates exclusion constraint "message_user_id_cooldown_period_key"
 DETAIL:  Key (user_id, cooldown_period)=(bananilson, ["2025-12-13 19:29:35.503712+00","2025-12-13 19:30:05.503712+00")) conflicts with existing key (user_id, cooldown_period)=(bananilson, ["2025-12-13 19:29:35.501992+00","2025-12-13 19:30:05.501992+00")).
 </pre>

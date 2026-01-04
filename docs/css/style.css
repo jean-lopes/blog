@@ -86,7 +86,7 @@ p {
     line-height: 1.6;
     letter-spacing: -0.02em;
     word-spacing: 0.1em;
-    text-align: justify;
+    /* text-align: justify; */
     overflow-wrap: break-word;
     margin: 1.5rem 0;
 }
@@ -112,7 +112,7 @@ label {
 }
 
 pre {
-    overflow-x: scroll;
+    overflow-x: auto;
 }
 
 figure {

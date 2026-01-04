@@ -78,10 +78,12 @@ statement. After installing it, we just schedule the following:
 
 #+NAME: cron
 #+BEGIN_SRC sql :results silent :tangle init.sql
-select cron.schedule( '1 second'
-                    , $$ update rate_limit
-                            set tokens = tokens + 1
-                          where tokens < 10 $$ );
+select cron.schedule(
+  '1 second',
+  $$ update rate_limit
+        set tokens = tokens + 1
+      where tokens < 10 $$
+);
 #+END_SRC
 
 Done. This refills 1 token per second for rows with less than 10

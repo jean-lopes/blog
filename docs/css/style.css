@@ -64,7 +64,13 @@ body {
     font-weight: 400;
     width: 80ch;
     margin: auto;
-    overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+    body {
+        width: 100%;
+        padding: 1rem;
+    }
 }
 
 h1 {
@@ -103,6 +109,10 @@ label {
 
 .src * {
     background-color: var(--bg-dim);
+}
+
+pre {
+    overflow-x: scroll;
 }
 
 figure {

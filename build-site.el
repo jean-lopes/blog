@@ -60,7 +60,7 @@
                                     :time-stamp-file nil
                                     :auto-sitemap t
                                     :sitemap-filename "index.org"
-                                    :html-head-extra "<link rel=\"stylesheet\" href=\"/css/style.css\" />")
+                                    :html-head-extra "<link rel=\"stylesheet\" href=\"css/style.css\" />")
                                    ("attachments"
                                     :base-directory "org/"
                                     :base-extension "dockerfile\\|sql\\|avif\\|png\\|yml"

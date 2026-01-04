@@ -1,5 +1,4 @@
 #+TITLE: Sitemap for project posts
 
 - [[file:rate-limiting.org][Rate limiting]]
-- rate-limiting-bursty-workloads
-  - [[file:rate-limiting-bursty-workloads/post.org][Rate limiting bursty workloads]]
+- [[file:rate-limiting-bursty-workloads.org][Rate limiting bursty workloads]]

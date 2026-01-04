@@ -65,17 +65,11 @@ body {
     width: 80ch;
     margin: auto;
     overflow-x: hidden;
-    /* display: grid; */
-    /* grid-template-columns: 1.5fr 9fr 1.5fr; */
 }
 
-/* body > * { */
-/*     grid-column: 2; */
-/* } */
-
 h1 {
-    /* letter-spacing: 0.015em; */
-    /* word-spacing: 0.15em; */
+    letter-spacing: 0.015em;
+    word-spacing: 0.15em;
     font-family: var(--serif);
     text-align: center;
     overflow-wrap: break-word;
@@ -83,9 +77,9 @@ h1 {
 }
 
 p {
-    /* line-height: 1.8; */
-    /* letter-spacing: -0.02em; */
-    /* word-spacing: 0.1em; */
+    line-height: 1.6;
+    letter-spacing: -0.02em;
+    word-spacing: 0.1em;
     text-align: justify;
     overflow-wrap: break-word;
     margin: 1.5rem 0;
@@ -93,7 +87,7 @@ p {
 
 small,
 label {
-    /* letter-spacing: 0.05em */
+    letter-spacing: 0.05em
     font-size: var(--font-size-small);
     font-weight: 300;
 }

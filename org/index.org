@@ -1,5 +1,5 @@
-#+TITLE: My Blog
-#+OPTIONS: toc:nil num:nil
+#+TITLE: Sitemap for project posts
 
 - [[file:rate-limiting.org][Rate limiting]]
-- [[file:rate-limiting-bursty-workloads/post.org][Rate limiting bursty workloads]]
+- rate-limiting-bursty-workloads
+  - [[file:rate-limiting-bursty-workloads/post.org][Rate limiting bursty workloads]]

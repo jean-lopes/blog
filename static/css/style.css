@@ -5,11 +5,11 @@
     --serif: 'Roboto Slab', serif;
     --mono:  'Roboto Mono', monospace;
 
-    --font-size-small:      1.6rem;
-    --font-size-body:       1.8rem;
-    --font-size-subheading: 1.9rem;
-    --font-size-heading:    2.2rem;
-    --font-size-title:      2.5rem;
+    --font-size-small:      1.11rem;
+    --font-size-body:       1.25rem;
+    --font-size-subheading: 1.40rem;
+    --font-size-heading:    1.58rem;
+    --font-size-title:      1.78rem;
 
     /* modus-themes-operandi-tinted */
     --fg-main: #000000;
@@ -62,15 +62,10 @@ html {
 body {
     font-size: var(--font-size-body);
     font-weight: 400;
-    width: 80ch;
-    margin: auto;
-}
-
-@media (max-width: 768px) {
-    body {
-        width: 100%;
-        padding: 1rem;
-    }
+    width: 100%;
+    max-width: 80ch;
+    margin: 0 auto;
+    padding: 1rem 1.5rem;
 }
 
 h1 {

@@ -1,6 +1,6 @@
 ;; font sizes
 ;; (setq ratio 1.125
-;;       base  1.75
+;;       base  1.25
 ;;       sizes (list (/ base ratio)
 ;;                   base
 ;;                   (* base ratio)

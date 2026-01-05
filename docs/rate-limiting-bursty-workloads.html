@@ -27,7 +27,7 @@ a rate of 1 token per second).
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sql" id="org58e1273"><span class="org-keyword">create</span> unlogged <span class="org-keyword">table</span> <span class="org-function-name">rate_limit</span>(       <span class="org-comment-delimiter">-- </span><span class="org-comment">1
+<pre class="src src-sql" id="orgdd880ca"><span class="org-keyword">create</span> unlogged <span class="org-keyword">table</span> <span class="org-function-name">rate_limit</span>(       <span class="org-comment-delimiter">-- </span><span class="org-comment">1
 </span>  id     <span class="org-type">int</span>      <span class="org-keyword">not</span> <span class="org-keyword">null</span>,
   tokens <span class="org-type">smallint</span> <span class="org-keyword">not</span> <span class="org-keyword">null</span>
                   <span class="org-keyword">default</span> 9             <span class="org-comment-delimiter">-- </span><span class="org-comment">2
@@ -112,7 +112,7 @@ statement. After installing it, we just schedule the following:
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sql" id="orge549a34"><span class="org-keyword">select</span> cron.schedule(
+<pre class="src src-sql" id="orge9574f4"><span class="org-keyword">select</span> cron.schedule(
   <span class="org-string">'1 second'</span>,
   $$ <span class="org-keyword">update</span> rate_limit
         <span class="org-keyword">set</span> tokens = tokens + 1
@@ -134,7 +134,7 @@ users.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh" id="org69c9f4b">docker exec -i pg pgbench <span class="org-sh-escaped-newline">\</span>
+<pre class="src src-sh" id="orgd2e5b57">docker exec -i pg pgbench <span class="org-sh-escaped-newline">\</span>
        --time=30 <span class="org-sh-escaped-newline">\</span>
        --client=1 <span class="org-sh-escaped-newline">\</span>
        --jobs=1 <span class="org-sh-escaped-newline">\</span>
@@ -152,7 +152,7 @@ systems have such widespread adoption.
 </p>
 
 
-<figure id="org74ca406">
+<figure id="org0b87b04">
 <img src="rate-limiting-bursty-workloads/tps-go-up.avif" alt="tps-go-up.avif">
 
 <figcaption><span class="figure-number">Figure 1: </span>me changing a table to unlogged</figcaption>
